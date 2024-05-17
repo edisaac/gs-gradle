@@ -1,17 +1,21 @@
 node {
-  def myGradleContainer = docker.image('gradle:jdk8-alpine')
-  myGradleContainer.pull()
-  stage('SCM check y Preparacion') {
-    checkout scm
-  }
-  stage('Testeo') {
-     myGradleContainer.inside("-v ${env.HOME}/.gradle:/home/gradle/.gradle") {
-       sh 'cd complete && gradle test'
-     }
-  }
-  stage('Ejecucion') {
-     myGradleContainer.inside("-v ${env.HOME}/.gradle:/home/gradle/.gradle") {
-       sh 'cd complete && gradle run'
-     }
-  }
+    def myGradleContainer = docker.image('gradle:jdk8-alpine')
+    myGradleContainer.pull()
+
+    //stage('Preparación') {
+    //    git branch: 'main', url: 'https://github.com/edisaac/gs-gradle.git'
+    //}
+
+    stage('Construcción') {
+      myGradleContainer.inside("-v ${env.HOME}/.gradle:/home/gradle/.gradle") {
+        sh 'cd complete && /opt/gradle/bin/gradle build'
+      }
+    }
+
+    stage('Sonar Scanner') {
+      def sonarqubeScannerHome = tool name: 'sonar', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+      withCredentials([string(credentialsId: 'sonar', variable: 'sonarLogin')]) {
+        sh "${sonarqubeScannerHome}/bin/sonar-scanner -e -Dsonar.host.url=http://10.155.130.135:9001 -Dsonar.login=${sonarLogin} -Dsonar.projectName=gs-gradle -Dsonar.projectVersion=${env.BUILD_NUMBER} -Dsonar.projectKey=GS -Dsonar.sources=complete/src/main/ -Dsonar.tests=complete/src/test/ -Dsonar.language=java -Dsonar.java.binaries=."
+      }
+    }
 }
